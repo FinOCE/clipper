@@ -30,7 +30,7 @@ client.on("messageReactionAdd", async (reaction, reactionUser) => {
   })
 
   await Promise.all([user, message])
-    .then(([user, message]) => bookmark(user, message.guild, message.channel, message))
+    .then(([user, message]) => bookmark(client, user, message.guild, message.channel, message))
     .catch(err => console.error(err))
 })
 
@@ -40,7 +40,7 @@ client.on("interactionCreate", async interaction => {
   await interaction.deferReply({ ephemeral: true }).catch(err => console.error(err))
 
   const { user, guild, channel, targetMessage: message } = interaction
-  await bookmark(user, guild, channel, message).catch(err => console.error(err))
+  await bookmark(client, user, guild, channel, message).catch(err => console.error(err))
   interaction.editReply({ content: "Message saved, check your DMs!" }).catch(err => console.error(err))
 })
 
