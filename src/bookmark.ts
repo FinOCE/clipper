@@ -1,6 +1,16 @@
-import { AttachmentBuilder, Client, EmbedBuilder, Guild, Message, TextBasedChannel, User } from "discord.js"
+import {
+  AttachmentBuilder,
+  ChannelType,
+  Client,
+  EmbedBuilder,
+  Guild,
+  Message,
+  TextBasedChannel,
+  User
+} from "discord.js"
 import { CanvasRenderingContext2D, createCanvas, loadImage } from "canvas"
 import moment from "moment"
+import { Color, headerGuildImageText, headerText } from "./styles"
 
 /**
  * Generate a screenshot of a message and then DM it to the specified user.
@@ -41,50 +51,110 @@ async function generateImage(guild: Guild | null, channel: TextBasedChannel | nu
 
   const padding = 50
   const imageSize = 130
+  const headerHeight = 100
 
   // Background
-  ctx.fillStyle = "#36393e"
+  ctx.fillStyle = Color.DiscordGrey
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-  // TODO: Add guild and channel header (or something for DMs?)
+  // Guild/channel header
+  if (guild && channel && channel.type == ChannelType.GuildText) {
+    const guildImageSize = 80
+    const guildImagePadding = (headerHeight - guildImageSize) / 2
+
+    headerText(ctx)
+    const guildNameWidth = ctx.measureText(guild.name).width
+    const channelNameWidth = ctx.measureText(`#${channel.name}`).width
+
+    const headerWidth = canvas.width
+    const headerContentWidth = guildImageSize + guildImagePadding + guildNameWidth + padding + channelNameWidth
+    const headerPadding = (headerWidth - headerContentWidth) / 2
+
+    // Header background
+    ctx.fillStyle = Color.DiscordGreyDark
+    ctx.fillRect(0, 0, canvas.width, headerHeight)
+
+    // Header guild image
+
+    ctx.beginPath()
+    ctx.arc(
+      headerPadding + guildImageSize / 2,
+      guildImagePadding + guildImageSize / 2,
+      guildImageSize / 2,
+      0,
+      Math.PI * 2,
+      true
+    )
+    ctx.closePath()
+    ctx.save()
+    ctx.clip()
+
+    ctx.fillStyle = Color.DiscordGreyDarker
+    ctx.fillRect(headerPadding, guildImagePadding, guildImageSize, guildImageSize)
+
+    headerGuildImageText(ctx)
+    ctx.fillText(
+      guild.name.charAt(0).toUpperCase(),
+      headerPadding + guildImageSize / 2,
+      guildImagePadding + guildImageSize / 2
+    )
+
+    const guildIcon = guild.iconURL({ extension: "jpg" })
+    if (guildIcon) {
+      const image = await loadImage(guildIcon)
+      ctx.drawImage(image, headerPadding, guildImagePadding, guildImageSize, guildImageSize)
+    }
+
+    ctx.restore()
+
+    // Header text
+    headerText(ctx)
+    ctx.fillText(guild.name, headerPadding + guildImageSize + guildImagePadding, headerHeight / 2)
+    headerText(ctx, true)
+    ctx.fillText(
+      `#${channel.name}`,
+      headerPadding + guildImageSize + guildImagePadding + guildNameWidth + padding,
+      headerHeight / 2
+    )
+  }
 
   // Avatar
   ctx.beginPath()
-  ctx.arc(padding + imageSize / 2, padding + imageSize / 2, imageSize / 2, 0, Math.PI * 2, true)
+  ctx.arc(padding + imageSize / 2, headerHeight + padding + imageSize / 2, imageSize / 2, 0, Math.PI * 2, true)
   ctx.closePath()
   ctx.save()
   ctx.clip()
 
   const image = await loadImage(message.author.displayAvatarURL({ extension: "jpg" }))
-  ctx.drawImage(image, padding, padding, imageSize, imageSize)
+  ctx.drawImage(image, padding, headerHeight + padding, imageSize, imageSize)
 
   ctx.restore()
 
   // Username
   ctx.font = "40px 'gg sans'"
-  ctx.fillStyle = message.member ? message.member.displayHexColor : "#ffffff"
+  ctx.fillStyle = message.member ? message.member.displayHexColor : Color.White
   ctx.textBaseline = "top"
   ctx.textAlign = "left"
-  ctx.fillText(message.author.displayName, padding + imageSize + padding, padding)
+  ctx.fillText(message.author.displayName, padding + imageSize + padding, headerHeight + padding)
 
   const usernameWidth = ctx.measureText(message.author.displayName).width
   const usernamePadding = 25
 
   // Date
   ctx.font = "35px 'gg sans'"
-  ctx.fillStyle = "#939aa3"
+  ctx.fillStyle = Color.LightGrey
   ctx.fillText(
     moment(message.createdAt).format("DD/MM/YYYY HH:mm"),
     padding + imageSize + padding + usernameWidth + usernamePadding,
-    padding + 5
+    headerHeight + padding + 5
   )
 
   // Text content
   ctx.font = "40px 'gg sans'"
-  ctx.fillStyle = "#ffffff"
+  ctx.fillStyle = Color.White
 
   separateMessageContent(message.content, ctx, canvas.width - padding * 3 - imageSize).map((line, index) => {
-    ctx.fillText(line, padding + imageSize + padding, padding + 60 + index * 60)
+    ctx.fillText(line, padding + imageSize + padding, headerHeight + padding + 60 + index * 60)
   })
 
   // TODO: Little un-obtrusive watermark at the bottom?
