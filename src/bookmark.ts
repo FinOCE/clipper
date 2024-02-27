@@ -10,7 +10,16 @@ import {
 } from "discord.js"
 import { CanvasRenderingContext2D, createCanvas, loadImage } from "canvas"
 import moment from "moment"
-import { Color, headerGuildImageText, headerText } from "./styles"
+import {
+  Color,
+  headerGuildImageText,
+  headerText,
+  messageContentText,
+  messageDateText,
+  replyContentText,
+  replyUsernameText,
+  usernameText
+} from "./styles"
 
 /**
  * Generate a screenshot of a message and then DM it to the specified user.
@@ -22,15 +31,17 @@ export default async function bookmark(
   user: User,
   guild: Guild | null,
   channel: TextBasedChannel | null,
-  message: Message
+  message: Message,
+  reply: Message | null
 ) {
   // Generate image
-  const buffer = await generateImage(guild, channel, message)
+  const buffer = await generateImage(guild, channel, message, reply)
   const attachment = new AttachmentBuilder(buffer, {
     name: `${message.author.username}-${message.createdTimestamp}.png`
   })
   const embed = new EmbedBuilder()
     .setTitle("Message saved!")
+    .setColor(Color.Blurple)
     .setImage(`attachment://${attachment.name}`)
     .setFooter({
       iconURL: client.user.displayAvatarURL({ extension: "jpg" }),
@@ -45,7 +56,12 @@ export default async function bookmark(
   //   .catch(err => console.error(err))
 }
 
-async function generateImage(guild: Guild | null, channel: TextBasedChannel | null, message: Message) {
+async function generateImage(
+  guild: Guild | null,
+  channel: TextBasedChannel | null,
+  message: Message,
+  reply: Message | null
+) {
   const canvas = createCanvas(1500, 1000)
   const ctx = canvas.getContext("2d")
 
@@ -75,7 +91,6 @@ async function generateImage(guild: Guild | null, channel: TextBasedChannel | nu
     ctx.fillRect(0, 0, canvas.width, headerHeight)
 
     // Header guild image
-
     ctx.beginPath()
     ctx.arc(
       headerPadding + guildImageSize / 2,
@@ -118,44 +133,129 @@ async function generateImage(guild: Guild | null, channel: TextBasedChannel | nu
     )
   }
 
+  // Calculate text content
+  messageContentText(ctx)
+  const lines = separateMessageContent(message.content, ctx, canvas.width - padding * 3 - imageSize)
+  const lineHeight = 60
+  const replyHeight = reply ? lineHeight : 0
+  const contentHeight = lines.length * lineHeight + replyHeight
+
+  const contentSpaceHeight = canvas.height - headerHeight - padding * 2
+  const contentMarginTop = headerHeight + padding + (contentSpaceHeight - contentHeight - lineHeight) / 2
+
+  // Reply message
+  if (reply) {
+    const replyAvatarSize = 50
+    const replyUsernamePadding = 8
+    const replyLineOffset = 8
+    const replyLineArcHeight = 8
+    const replyLineForcedExtraHeight = 3
+
+    // Reply line
+    ctx.lineWidth = 6
+    ctx.strokeStyle = Color.DiscordGreyLight
+    ctx.beginPath()
+    ctx.moveTo(padding + imageSize / 2, contentMarginTop + replyHeight - replyLineOffset)
+    ctx.arcTo(
+      padding + imageSize / 2,
+      contentMarginTop + replyHeight / 2 - replyLineForcedExtraHeight,
+      padding + imageSize + padding - replyLineOffset,
+      contentMarginTop + replyHeight / 2 - replyLineForcedExtraHeight,
+      Math.sqrt(replyLineArcHeight ** 2 + replyLineArcHeight ** 2)
+    )
+    ctx.lineTo(
+      padding + imageSize + padding - replyLineOffset,
+      contentMarginTop + replyHeight / 2 - replyLineForcedExtraHeight
+    )
+    ctx.stroke()
+
+    // Reply avatar
+    ctx.beginPath()
+    ctx.arc(
+      padding + imageSize + padding + replyAvatarSize / 2,
+      contentMarginTop + replyAvatarSize / 2,
+      replyAvatarSize / 2,
+      0,
+      Math.PI * 2,
+      true
+    )
+    ctx.closePath()
+    ctx.save()
+    ctx.clip()
+
+    const replyAvatar = await loadImage(message.author.displayAvatarURL({ extension: "jpg" }))
+    ctx.drawImage(replyAvatar, padding + imageSize + padding, contentMarginTop, replyAvatarSize, replyAvatarSize)
+
+    ctx.restore()
+
+    // Reply username
+    replyUsernameText(ctx, reply.member)
+    ctx.fillText(
+      reply.author.displayName,
+      padding + imageSize + padding + replyAvatarSize + replyUsernamePadding,
+      contentMarginTop
+    )
+
+    const usernameWidth = ctx.measureText(reply.author.displayName).width
+
+    // Reply message content
+    ctx.beginPath()
+    ctx.rect(
+      padding + imageSize + padding + replyAvatarSize + usernameWidth + replyUsernamePadding * 2,
+      contentMarginTop,
+      canvas.width - (padding * 3 + imageSize + replyAvatarSize + usernameWidth + replyUsernamePadding * 2),
+      lineHeight
+    )
+    ctx.closePath()
+    ctx.save()
+    ctx.clip()
+
+    replyContentText(ctx)
+    ctx.fillText(
+      reply.content,
+      padding + imageSize + padding + replyAvatarSize + usernameWidth + replyUsernamePadding * 2,
+      contentMarginTop
+    )
+
+    ctx.restore()
+
+    // TODO: Add edited indicator
+  }
+
   // Avatar
   ctx.beginPath()
-  ctx.arc(padding + imageSize / 2, headerHeight + padding + imageSize / 2, imageSize / 2, 0, Math.PI * 2, true)
+  ctx.arc(padding + imageSize / 2, contentMarginTop + replyHeight + imageSize / 2, imageSize / 2, 0, Math.PI * 2, true)
   ctx.closePath()
   ctx.save()
   ctx.clip()
 
   const image = await loadImage(message.author.displayAvatarURL({ extension: "jpg" }))
-  ctx.drawImage(image, padding, headerHeight + padding, imageSize, imageSize)
+  ctx.drawImage(image, padding, contentMarginTop + replyHeight, imageSize, imageSize)
 
   ctx.restore()
 
   // Username
-  ctx.font = "40px 'gg sans'"
-  ctx.fillStyle = message.member ? message.member.displayHexColor : Color.White
-  ctx.textBaseline = "top"
-  ctx.textAlign = "left"
-  ctx.fillText(message.author.displayName, padding + imageSize + padding, headerHeight + padding)
+  usernameText(ctx, message.member)
+  ctx.fillText(message.author.displayName, padding + imageSize + padding, contentMarginTop + replyHeight)
 
   const usernameWidth = ctx.measureText(message.author.displayName).width
   const usernamePadding = 25
 
   // Date
-  ctx.font = "35px 'gg sans'"
-  ctx.fillStyle = Color.LightGrey
+  messageDateText(ctx)
   ctx.fillText(
     moment(message.createdAt).format("DD/MM/YYYY HH:mm"),
     padding + imageSize + padding + usernameWidth + usernamePadding,
-    headerHeight + padding + 5
+    contentMarginTop + replyHeight + 5
   )
 
-  // Text content
-  ctx.font = "40px 'gg sans'"
-  ctx.fillStyle = Color.White
-
-  separateMessageContent(message.content, ctx, canvas.width - padding * 3 - imageSize).map((line, index) => {
-    ctx.fillText(line, padding + imageSize + padding, headerHeight + padding + 60 + index * 60)
+  // Message content
+  messageContentText(ctx)
+  lines.forEach((line, index) => {
+    ctx.fillText(line, padding + imageSize + padding, contentMarginTop + replyHeight + lineHeight + index * lineHeight)
   })
+
+  // TODO: Add edited indicator
 
   // TODO: Little un-obtrusive watermark at the bottom?
 

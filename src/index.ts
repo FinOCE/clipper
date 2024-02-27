@@ -21,16 +21,18 @@ client.on("messageReactionAdd", async (reaction, reactionUser) => {
     }
   })
 
-  const message = new Promise<Message>((res, rej) => {
+  const msg = new Promise<{ message: Message; reply: Message | null }>(async (res, rej) => {
     try {
-      res(reaction.message.fetch())
+      const message = await reaction.message.fetch()
+      const reply = message.reference ? await message.fetchReference() : null
+      res({ message, reply })
     } catch (err) {
       rej()
     }
   })
 
-  await Promise.all([user, message])
-    .then(([user, message]) => bookmark(client, user, message.guild, message.channel, message))
+  await Promise.all([user, msg])
+    .then(([user, msg]) => bookmark(client, user, msg.message.guild, msg.message.channel, msg.message, msg.reply))
     .catch(err => console.error(err))
 })
 
@@ -40,7 +42,8 @@ client.on("interactionCreate", async interaction => {
   await interaction.deferReply({ ephemeral: true }).catch(err => console.error(err))
 
   const { user, guild, channel, targetMessage: message } = interaction
-  await bookmark(client, user, guild, channel, message).catch(err => console.error(err))
+  const reply = message.reference ? await message.fetchReference() : null
+  await bookmark(client, user, guild, channel, message, reply).catch(err => console.error(err))
   interaction.editReply({ content: "Message saved, check your DMs!" }).catch(err => console.error(err))
 })
 
