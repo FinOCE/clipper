@@ -1,6 +1,7 @@
 import { Client, Message, Partials, User } from "discord.js"
 import dotenv from "dotenv"
 import bookmark from "./bookmark"
+import { AboutEmbed } from "./embeds/AboutEmbed"
 
 dotenv.config()
 
@@ -38,7 +39,16 @@ client.on("messageReactionAdd", async (reaction, reactionUser) => {
 
 // Handle message context menu interaction
 client.on("interactionCreate", async interaction => {
-  if (interaction.user.bot || !interaction.isMessageContextMenuCommand()) return
+  if (interaction.user.bot) return
+
+  // Handle about me
+  if (interaction.isChatInputCommand() && interaction.commandName === "about") {
+    await interaction.reply({ embeds: [AboutEmbed()], ephemeral: true })
+    return
+  }
+
+  // Handle context menus
+  if (!interaction.isMessageContextMenuCommand()) return
   await interaction.deferReply({ ephemeral: true }).catch(err => console.error(err))
 
   const { user, guild, channel, targetMessage: message } = interaction

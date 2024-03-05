@@ -257,6 +257,20 @@ async function generateImage(
 
   // TODO: Add edited indicator
 
+  // TODO: Display images
+
+  // TODO: Display starting frame of video (?)
+
+  // TODO: Display stickers
+
+  // TODO: Display embeds
+
+  // TODO: Display emojis
+
+  // TODO: Display reactions
+
+  // TODO: Format markdown
+
   // TODO: Little un-obtrusive watermark at the bottom?
 
   return canvas.toBuffer("image/jpeg", { quality: 1 })
