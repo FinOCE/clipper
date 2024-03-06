@@ -43,7 +43,7 @@ client.on("interactionCreate", async interaction => {
 
   // Handle about me
   if (interaction.isChatInputCommand() && interaction.commandName === "about") {
-    await interaction.reply({ embeds: [AboutEmbed()], ephemeral: true })
+    await interaction.reply({ embeds: [AboutEmbed()], ephemeral: true }).catch(console.error)
     return
   }
 
